@@ -19,6 +19,8 @@ spring:
           jwk-set-uri: http://keycloak:8888/realms/management-realm/protocol/openid-connect/certs
           issuer-uri: http://keycloak:8888/realms/management-realm
   flyway:
+    schemas: course_management
+    default-schema: course_management
     enabled: true
     locations: classpath:database/migration
     baseline-on-migrate: true

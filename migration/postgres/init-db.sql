@@ -28,3 +28,17 @@ GRANT ALL PRIVILEGES ON DATABASE coursedb TO coursedb_user;
 -- Grant privileges to coursedb_user
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO coursedb_user;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO coursedb_user;
+
+-- Create course_management schema
+\echo 'Starting schema creation...'
+CREATE SCHEMA IF NOT EXISTS course_management;
+\echo 'Schema course_management created successfully.'
+ALTER SCHEMA course_management OWNER TO coursedb_user;
+
+-- Grant privileges to course_management
+GRANT ALL PRIVILEGES ON SCHEMA course_management TO coursedb_user;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA course_management TO coursedb_user;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA course_management TO coursedb_user;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA course_management GRANT ALL ON TABLES TO coursedb_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA course_management GRANT ALL ON SEQUENCES TO coursedb_user;

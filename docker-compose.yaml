@@ -33,7 +33,7 @@ services:
     networks:
       - microservices-network
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8080/realms/management-realm/.well-known/openid-configuration" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/realms/course-realm/.well-known/openid-configuration" ]
       interval: 30s
       timeout: 10s
       retries: 5
