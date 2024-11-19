@@ -23,7 +23,7 @@ services:
       KC_FEATURES: scripts
     command:
       - start-dev
-#      - --import-realm
+      - --import-realm
       - --http-enabled=true
       - --hostname-strict=false
       - --hostname-strict-https=false
