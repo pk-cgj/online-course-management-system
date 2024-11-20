@@ -1,164 +1,189 @@
 package com.coursemanagement.service;
 
-import com.coursemanagement.config.JwtTokenExtractor;
-import com.coursemanagement.dto.CourseDTO;
+import com.coursemanagement.dto.CourseDto;
+import com.coursemanagement.dto.CourseSimpleDto;
 import com.coursemanagement.entity.Category;
 import com.coursemanagement.entity.Course;
+import com.coursemanagement.entity.LessonProgress;
 import com.coursemanagement.entity.User;
+import com.coursemanagement.exception.CourseEntityNotFoundException;
+import com.coursemanagement.mapper.CourseMapper;
 import com.coursemanagement.repository.CategoryRepository;
 import com.coursemanagement.repository.CourseRepository;
+import com.coursemanagement.repository.LessonProgressRepository;
 import com.coursemanagement.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class CourseService {
-
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
     private final CourseRepository courseRepository;
+    private final LessonProgressRepository lessonProgressRepository;
+    private final LessonProgressService lessonProgressService;
+    private final CourseMapper courseMapper;
 
     @Transactional
-    public void createOrUpdateUserFromKeycloak(JwtTokenExtractor.TokenInfo tokenInfo) {
-        userRepository.findByEmail(tokenInfo.email())
-                .ifPresentOrElse(
-                        user -> updateExistingUser(user, tokenInfo),
-                        () -> createNewUser(tokenInfo)
-                );
-    }
+    public CourseDto createCourse(CourseDto.CreateCourseDto createCourseDto, String instructorEmail) {
+        User instructor = userRepository.findByEmail(instructorEmail)
+                .orElseThrow(() -> new CourseEntityNotFoundException("Instructor not found"));
 
-    @Transactional
-    public CourseDTO createCourse(CourseDTO courseDTO) {
-        User instructor = userRepository.findById(courseDTO.getInstructorId())
-                .orElseThrow(() -> new RuntimeException("Instructor not found"));
+        Category category = categoryRepository.findById(createCourseDto.getCategoryId())
+                .orElseThrow(() -> new CourseEntityNotFoundException("Category not found"));
 
-        Category category = categoryRepository.findById(courseDTO.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("Category not found"));
-
-        Course course = Course.builder()
-                .title(courseDTO.getTitle())
-                .description(courseDTO.getDescription())
-                .instructor(instructor)
-                .category(category)
-                .difficultyLevel(courseDTO.getDifficultyLevel())
-                .durationHours(courseDTO.getDurationHours())
-                .isPublished(courseDTO.getIsPublished())
-                .build();
-
-        courseRepository.save(course);
-        return mapToCourseDto(course);
-    }
-
-    @Transactional
-    public CourseDTO editCourse(Long courseId, CourseDTO courseDTO) {
-        Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new RuntimeException("Course not found"));
-
-        Category category = categoryRepository.findById(courseDTO.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("Category not found"));
-
-        course.setTitle(courseDTO.getTitle());
-        course.setDescription(courseDTO.getDescription());
+        Course course = courseMapper.toEntity(createCourseDto);
+        course.setInstructor(instructor);
         course.setCategory(category);
-        course.setDifficultyLevel(courseDTO.getDifficultyLevel());
-        course.setDurationHours(courseDTO.getDurationHours());
-        course.setIsPublished(courseDTO.getIsPublished());
+        course.setIsPublished(false);
 
         courseRepository.save(course);
-        return mapToCourseDto(course);
+        return courseMapper.toDto(course);
+    }
+
+    @Transactional
+    public CourseDto updateCourse(Long courseId, CourseDto.UpdateCourseDto updateCourseDto) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new CourseEntityNotFoundException("Course not found"));
+
+        if (updateCourseDto.getCategoryId() != null) {
+            Category category = categoryRepository.findById(updateCourseDto.getCategoryId())
+                    .orElseThrow(() -> new CourseEntityNotFoundException("Category not found"));
+            course.setCategory(category);
+        }
+
+        courseMapper.updateEntity(course, updateCourseDto);
+        courseRepository.save(course);
+        return courseMapper.toDto(course);
+    }
+
+    @Transactional
+    public CourseDto publishCourse(Long courseId) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new CourseEntityNotFoundException("Course not found"));
+
+        course.setIsPublished(true);
+        courseRepository.save(course);
+        return courseMapper.toDto(course);
     }
 
     @Transactional
     public void deleteCourse(Long courseId) {
         Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new RuntimeException("Course not found"));
+                .orElseThrow(() -> new CourseEntityNotFoundException("Course not found"));
         courseRepository.delete(course);
     }
 
-    public List<CourseDTO> getAllCourses() {
+    public CourseDto getCourse(Long courseId) {
+        return courseRepository.findById(courseId)
+                .map(courseMapper::toDto)
+                .orElseThrow(() -> new CourseEntityNotFoundException("Course not found"));
+    }
+
+    public List<CourseDto> getAllCourses() {
         return courseRepository.findAll().stream()
-                .map(this::mapToCourseDto)
+                .map(courseMapper::toDto)
+                .collect(Collectors.toList());
+    }
+
+    public List<CourseDto> getCoursesByInstructor(String instructorEmail) {
+        User instructor = userRepository.findByEmail(instructorEmail)
+                .orElseThrow(() -> new CourseEntityNotFoundException("Instructor not found"));
+
+        return courseRepository.findByInstructor(instructor).stream()
+                .map(courseMapper::toDto)
                 .collect(Collectors.toList());
     }
 
     @Transactional
     public void enrollInCourse(Long courseId, String studentEmail) {
         User student = userRepository.findByEmail(studentEmail)
-                .orElseThrow(() -> new RuntimeException("Student not found"));
+                .orElseThrow(() -> new CourseEntityNotFoundException("Student not found"));
         Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new RuntimeException("Course not found"));
+                .orElseThrow(() -> new CourseEntityNotFoundException("Course not found"));
 
-        student.getEnrolledCourses().add(course);
+        if (!course.getIsPublished()) {
+            throw new IllegalStateException("Cannot enroll in an unpublished course");
+        }
+        course.getLessons()
+                .forEach(lesson -> {
+                    if (!lesson.getIsPublished()) {
+                        throw new IllegalStateException("Cannot enroll in a course with unpublished lesson");
+                    }
+                });
+
+        student.enrollInCourse(course);
+        userRepository.save(student);
+
+        lessonProgressService.initializeLessonProgressForCourse(student, course);
+    }
+
+    @Transactional
+    public void unEnrollFromCourse(Long courseId, String studentEmail) {
+        User student = userRepository.findByEmail(studentEmail)
+                .orElseThrow(() -> new CourseEntityNotFoundException("Student not found"));
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new CourseEntityNotFoundException("Course not found"));
+
+        student.unenrollFromCourse(course);
         userRepository.save(student);
     }
 
-    public List<CourseDTO> getEnrolledCourses(Long studentId) {
-        User student = userRepository.findById(studentId)
-                .orElseThrow(() -> new RuntimeException("Student not found"));
+    public List<CourseSimpleDto> getEnrolledCourses(String studentEmail) {
+        User student = userRepository.findByEmail(studentEmail)
+                .orElseThrow(() -> new CourseEntityNotFoundException("Student not found"));
 
         return student.getEnrolledCourses().stream()
-                .map(this::mapToCourseDto)
+                .map(course -> {
+                    CourseSimpleDto courseDto = courseMapper.toSimpleDto(course);
+
+                    List<LessonProgress> progressList = lessonProgressRepository
+                            .findByUserIdAndCourseId(student.getId(), course.getId());
+
+                    int totalLessons = progressList.size();
+                    int completedLessons = (int) progressList.stream()
+                            .filter(lp -> lp.getStatus() == LessonProgress.ProgressStatus.COMPLETED)
+                            .count();
+
+                    double progressPercentage = totalLessons > 0
+                            ? (completedLessons * 100.0 / totalLessons)
+                            : 0.0;
+
+                    courseDto.setProgress(CourseSimpleDto.CourseProgressDto.builder()
+                            .totalLessons(totalLessons)
+                            .completedLessons(completedLessons)
+                            .progressPercentage(progressPercentage)
+                            .build());
+
+                    return courseDto;
+                })
                 .collect(Collectors.toList());
     }
 
-    private void updateExistingUser(User user, JwtTokenExtractor.TokenInfo tokenInfo) {
-        if (!user.getRole().equals(tokenInfo.role())) {
-            log.info("Updating role for user with email: {}", tokenInfo.email());
-            user.setRole(tokenInfo.role());
-            user.setUpdatedAt(ZonedDateTime.now());
-            userRepository.save(user);
+    public List<CourseDto> searchCourses(String title, String category, String instructor) {
+        String firstName = null;
+        String lastName = null;
+
+        if (instructor != null) {
+            String[] parts = instructor.split(" ");
+            firstName = parts[0];
+            lastName = parts[1];
         }
+        List<Course> courses = courseRepository.searchCourses(title, category, firstName, lastName);
+        return courses.stream()
+                .map(courseMapper::toDto)
+                .collect(Collectors.toList());
     }
 
-    private void createNewUser(JwtTokenExtractor.TokenInfo tokenInfo) {
-        log.info("Creating new user with email: {}", tokenInfo.email());
-
-        String[] nameParts = splitFullName(tokenInfo.name());
-        String firstName = nameParts[0];
-        String lastName = nameParts[1];
-
-        User newUser = User.builder()
-                .email(tokenInfo.email())
-                .firstName(firstName)
-                .lastName(lastName)
-                .role(tokenInfo.role())
-                .createdAt(ZonedDateTime.now())
-                .updatedAt(ZonedDateTime.now())
-                .build();
-
-        userRepository.save(newUser);
-    }
-
-    private String[] splitFullName(String fullName) {
-        if (fullName == null || fullName.isBlank()) {
-            return new String[]{"Unknown", ""};
-        }
-
-        String[] nameParts = fullName.split(" ", 2);
-        String firstName = nameParts[0];
-        String lastName = nameParts.length > 1 ? nameParts[1] : "";
-
-        return new String[]{firstName, lastName};
-    }
-
-    private CourseDTO mapToCourseDto(Course course) {
-        return CourseDTO.builder()
-                .id(course.getId())
-                .title(course.getTitle())
-                .description(course.getDescription())
-                .instructorId(course.getInstructor().getId())
-                .categoryId(course.getCategory().getId())
-                .difficultyLevel(course.getDifficultyLevel())
-                .durationHours(course.getDurationHours())
-                .isPublished(course.getIsPublished())
-                .build();
+    public List<CourseDto> filterCourses(Course.DifficultyLevel difficultyLevel, Integer duration) {
+        List<Course> courses = courseRepository.filterCourses(difficultyLevel, duration);
+        return courses.stream()
+                .map(courseMapper::toDto)
+                .collect(Collectors.toList());
     }
 }
