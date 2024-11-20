@@ -1,9 +1,10 @@
 package com.coursemanagement.controller;
 
 import com.coursemanagement.config.JwtTokenExtractor;
-import com.coursemanagement.service.CourseService;
+import com.coursemanagement.service.UserService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,16 +24,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.HashMap;
-import java.util.Map;
-
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Authentication Controller", description = "APIs for managing authentication")
 public class AuthController {
 
-    private final CourseService courseService;
+    private final UserService userService;
     private final ObjectMapper objectMapper;
     private final JwtTokenExtractor jwtTokenExtractor;
 
@@ -65,9 +64,9 @@ public class AuthController {
             try {
                 JsonNode root = objectMapper.readTree(response.getBody());
                 String accessToken = root.path("access_token").asText();
-                JwtTokenExtractor.TokenInfo tokenInfo = jwtTokenExtractor.extractTokenInfo(accessToken);
+                JwtTokenExtractor.UserInfo userInfo = jwtTokenExtractor.extractUserInfo(accessToken);
 
-                courseService.createOrUpdateUserFromKeycloak(tokenInfo);
+                userService.createOrUpdateUserFromKeycloak(userInfo);
 
                 return ResponseEntity.ok(response.getBody());
             } catch (Exception e) {
@@ -78,13 +77,7 @@ public class AuthController {
     }
 
     @GetMapping("/user-info")
-    public Map<String, Object> getUserInfo(@AuthenticationPrincipal Jwt jwt) {
-        Map<String, Object> userInfo = new HashMap<>();
-        userInfo.put("sub", jwt.getSubject());
-        userInfo.put("preferred_username", jwt.getClaim("preferred_username"));
-        userInfo.put("email", jwt.getClaim("email"));
-        userInfo.put("name", jwt.getClaim("name"));
-        userInfo.put("scope", jwt.getClaim("scope"));
-        return userInfo;
+    public JwtTokenExtractor.UserInfo getUserInfo(@AuthenticationPrincipal Jwt jwt) {
+        return jwtTokenExtractor.extractUserInfo(jwt.getTokenValue());
     }
 }
