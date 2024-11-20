@@ -23,7 +23,7 @@ public class OpenApiConfig {
 
 
         return new OpenAPI().components(new Components()
-                .addSecuritySchemes("bearerAuth", securityScheme))
+                        .addSecuritySchemes("bearerAuth", securityScheme))
                 .addSecurityItem(securityItem);
     }
 }
