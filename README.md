@@ -1,58 +1,170 @@
 # Online Course Management System
 
-This project is a **Spring Boot** application for managing online courses. It allows instructors to create and manage
-courses while enabling students to browse, enroll, and access course materials. The system implements user roles, secure
-authentication, and basic course management features.
+## Project Overview
+
+A comprehensive Spring Boot-based Online Course Management System that provides a platform for instructors to create and
+manage courses, and students to enroll and track their learning progress.
+
+## Technologies Used
+
+- **Framework**: Spring Boot (Java 17)
+- **Database**: PostgreSQL
+- **Authentication**: Keycloak OAuth2 with JWT
+- **Migration**: Flyway
+- **Documentation**: Swagger OpenAPI
+
+### Key Dependencies
+
+- Spring Web
+- Spring Security
+- Spring Data JPA
+- PostgreSQL Driver
+- Keycloak OAuth2
+- Flyway
+- Swagger OpenAPI
+
+## System Architecture
+
+### Microservices Configuration
+
+- **Keycloak**: Authentication and Authorization Server
+- **PostgreSQL**: Primary Database
+- **Online Course Application**: Main Application Server
+
+## Authentication and Authorization
+
+### Identity Management
+
+- **Platform**: Keycloak
+- **Authentication Flow**: OAuth2 Authorization Code
+- **Token Type**: JWT (JSON Web Tokens)
+
+### Predefined Users
+
+| Username | Password | Role        |
+|----------|----------|-------------|
+| jamesdio | jamesdio | ADMIN       |
+| johndoe  | johndoe  | INSTRUCTOR  |
+| janedoe  | janedoe  | STUDENT     |
 
 ## Features
 
-1. **User Roles and Authentication**
-    - Authentication and Authorization via **Keycloak** and **Spring Security**.
-    - **JWT Tokens** are used for secure API access.
-    - Roles:
-        - **Instructor**: Create and manage courses.
-        - **Student**: Enroll, browse, and interact with courses.
+### User Roles and Permissions
 
-2. **Course Management (Instructor Role)**
-    - Instructors can:
-        - Create and edit courses, including title, description, and category.
-        - Add lessons/modules to courses.
-        - Delete courses.
+1. **ADMIN**
+    - Manage system categories
+    - Full administrative access
 
-3. **Enrollment and Access (Student Role)**
-    - Students can:
-        - Browse and search available courses.
-        - Enroll in courses.
-        - Access reading materials and course content.
+2. **INSTRUCTOR**
+    - Create and manage courses
+    - Add course modules and lessons
+    - Publish/unpublish courses
+    - Track student enrollments
 
-4. **Database Design**
-    - **H2 Database** (in-memory) is used for testing and development.
-    - Models include:
-        - Users (with roles: Instructor/Student).
-        - Courses (title, description, category).
-        - Lessons (linked to courses).
-        - Enrollments (tracks student-course relationships).
+3. **STUDENT**
+    - Browse available courses
+    - Enroll/unenroll in courses
+    - Access course content
+    - Track learning progress
 
-## Setup
+### Course Management
+
+- Create courses with detailed information
+- Multi-level course structure (Courses → Lessons)
+- Course categorization
+- Course publishing workflow
+- Search and filter capabilities
+
+### Lesson Management
+
+- Create, update, and delete lessons
+- Lesson progress tracking
+- Progress status management
+
+## API Endpoints
+
+### Authentication Endpoints
+
+- `POST /api/login`: User authentication
+- `GET /api/user-info`: Retrieve user information
+
+### Course Endpoints
+
+- `POST /api/v1/courses`: Create a course
+- `GET /api/v1/courses`: List all courses
+- `GET /api/v1/courses/search`: Search courses
+- `GET /api/v1/courses/filter`: Filter courses
+- `POST /api/v1/courses/{courseId}/enroll`: Enroll in a course
+
+### Lesson Endpoints
+
+- `POST /api/v1/courses/{courseId}/lessons`: Create a lesson
+- `PUT /api/v1/lessons/{lessonId}/progress`: Update lesson progress
+- `GET /api/v1/courses/{courseId}/lessons`: Get course lessons
+
+### Category Endpoints
+
+- `POST /api/v1/categories`: Create a category
+- `GET /api/v1/categories`: List all categories
+
+## Development Setup
 
 ### Prerequisites
 
-- **Java 17** or higher
-- **Docker** and **Docker Compose**
+- Java 17
+- Docker
+- PostgreSQL
+- Keycloak
 
-### Running the Application
+### Configuration
 
-1. **Clone the Repository**
-    ```sh
-    git clone https://github.com/pk-cgj/online-course-management-system.git
-    cd online-course-management-system
-    ```
+1. Clone the repository
+2. Set environment variables in `docker-compose.yml`
+3. Run Docker Compose:
+   ```bash
+   docker-compose up -d
+   ```
 
-2. **Start Services with Docker Compose**
-    ```sh
-    docker-compose up
-    ```
+### Local Development
 
-3. **Access the Application**
-    - Keycloak: `http://localhost:8888`
-    - Application: `http://localhost:8080/swagger-ui.html` (Swagger UI for API documentation)
+- Provide environment variables for existing `application.properties`
+- Configure PostgreSQL connection
+- Set up Keycloak realm
+
+## API Documentation
+
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- API Docs: `http://localhost:8080/v3/api-docs`
+
+## Docker Composition
+
+### Services
+
+- **Keycloak**: Authentication Server
+- **PostgreSQL**: Database
+- **Online Course App**: Main Application
+
+## Security Considerations
+
+- OAuth2 Resource Server
+- JWT Token Validation
+- Role-Based Access Control
+- Secure Endpoint Protection
+
+## Monitoring and Logging
+
+- Slf4j logging
+- Health checks for services
+
+## Future Improvements
+
+- Implement course reviews
+- Advanced filtering
+- More granular access controls
+- Comprehensive error handling
+
+## Troubleshooting
+
+- Verify Keycloak realm configuration
+- Check database connections
+- Validate JWT token settings
